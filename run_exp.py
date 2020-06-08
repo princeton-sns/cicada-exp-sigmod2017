@@ -173,7 +173,7 @@ max_thread_count = None
 
 prefix = ''
 suffix = ''
-total_seqs = 5
+total_seqs = 1
 max_retries = 3
 
 hugepage_count = {
@@ -182,8 +182,8 @@ hugepage_count = {
   'TICTOC': 32 * 1024 / 2,
   'NO_WAIT': 32 * 1024 / 2,
   # 32 GiB + (16 GiB for RCU)
-  'MICA': (32 + 16) * 1024 / 2,
-  'MICA+INDEX': (32 + 16) * 1024 / 2,
+  'MICA': (64 + 16) * 1024 / 2,
+  'MICA+INDEX': (64 + 16) * 1024 / 2,
   # 96 GiB
   'HEKATON': 96 * 1024 / 2,
 
@@ -301,7 +301,7 @@ def enum_exps(seq):
       if tag == 'native-macrobench' and alg not in ('MICA', 'MICA+INDEX', 'MICA+FULLINDEX'):
         continue
 
-      for thread_count in [1, 2] + list(range(4, max_thread_count + 1, 4)):
+      for thread_count in [1, 2] + list(range(4, max_thread_count + 1, 2)):
         common = { 'seq': seq, 'tag': tag, 'alg': alg, 'thread_count': thread_count }
 
         if alg in ('FOEDUS-MOCC-REF', 'FOEDUS-OCC-REF') and thread_count < 4:
