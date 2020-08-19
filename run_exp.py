@@ -127,6 +127,25 @@ def set_tatp(conf, thread_count, scale_factor, tx_count, **kwargs):
   return conf
 
 
+def set_insert(conf, thread_count, bench, inserts_per_txn, repl_enabled,
+               tx_count, logger, ccc, **kwargs):
+
+  conf = replace_def(conf, 'WORKLOAD', 'INSERT')
+  conf = replace_def(conf, 'WARMUP', str(0)) # TODO: Handle replication warmup
+  conf = replace_def(conf, 'MICA_LOGGER', str(logger))
+  conf = replace_def(conf, 'MICA_REPL_ENABLED', str(repl_enabled))
+  conf = replace_def(conf, 'MICA_CCC', str(ccc))
+
+  # TODO: Find proper settings for these
+  conf = replace_def(conf, 'MAX_TXN_PER_PART', str(tx_count))
+  conf = replace_def(conf, 'MAX_TUPLE_SIZE', str(8))
+  conf = replace_def(conf, 'PART_CNT', str(1))
+
+  conf = replace_def(conf, 'INSERT_INSERTS_PER_TXN', str(inserts_per_txn))
+
+  return conf
+
+
 def set_threads(conf, thread_count, **kwargs):
   return replace_def(conf, 'THREAD_CNT', thread_count)
 
@@ -173,7 +192,7 @@ max_thread_count = None
 
 prefix = ''
 suffix = ''
-total_seqs = 1
+total_seqs = 5
 max_retries = 3
 
 hugepage_count = {
@@ -181,9 +200,9 @@ hugepage_count = {
   'SILO': 32 * 1024 / 2,
   'TICTOC': 32 * 1024 / 2,
   'NO_WAIT': 32 * 1024 / 2,
-  # 32 GiB + (16 GiB for RCU)
-  'MICA': (64 + 16) * 1024 / 2,
-  'MICA+INDEX': (64 + 16) * 1024 / 2,
+  # 32 GiB + 16 GiB for RCU + 8 GiB for logging
+  'MICA': (32 + 16 + 8) * 1024 / 2,
+  'MICA+INDEX': (32 + 16 + 8) * 1024 / 2,
   # 96 GiB
   'HEKATON': 96 * 1024 / 2,
 
@@ -274,18 +293,18 @@ def format_exp(exp):
 
 
 def enum_exps(seq):
-  all_algs = ['MICA', 'MICA+INDEX', #'MICA+FULLINDEX',
-              'SILO', 'TICTOC', 'HEKATON', 'NO_WAIT',
-              'SILO-REF',
+  all_algs = ['MICA', # 'MICA+INDEX', #'MICA+FULLINDEX',
+              # 'SILO', 'TICTOC', 'HEKATON', 'NO_WAIT',
+              # 'SILO-REF',
               # 'SILO-REF-BACKOFF',
               #'ERMIA-SI-REF',
               #'ERMIA-SSI-REF',
-              'ERMIA-SI_SSN-REF',
+              # 'ERMIA-SI_SSN-REF',
               # 'ERMIA-SI-REF-BACKOFF',
               # 'ERMIA-SSI-REF-BACKOFF',
               # 'ERMIA-SI_SSN-REF-BACKOFF',
-              'FOEDUS-MOCC-REF',
-              'FOEDUS-OCC-REF',
+              # 'FOEDUS-MOCC-REF',
+              # 'FOEDUS-OCC-REF',
              ]
 
   macrobenchs = ['macrobench']
@@ -341,6 +360,25 @@ def enum_exps(seq):
             for zipf_theta in [0.00, 0.99]:
               ycsb.update({ 'read_ratio': read_ratio, 'zipf_theta': zipf_theta })
               yield dict(ycsb)
+
+        # INSERT
+        if alg in ('MICA',):
+          insert = dict(common)
+          tx_count = 2000000
+          insert.update({ 'bench': 'INSERT', 'tx_count': tx_count })
+
+          for inserts_per_txn in [1]: # [1, 2, 4, 8]:
+            insert.update({ 'inserts_per_txn': inserts_per_txn })
+            for repl_enabled in ('true', 'false'):
+              logger = 'MICA_LOG_MMAP' if repl_enabled == 'true' else 'MICA_LOG_NULL'
+              insert.update({ 'repl_enabled': repl_enabled, 'logger': logger })
+              if repl_enabled == 'true':
+                for ccc in ('MICA_CCC_COPYCAT',):
+                  insert.update({ 'ccc': ccc })
+                  yield dict(insert)
+              else:
+                insert.update({ 'ccc': 'MICA_CCC_NONE' })
+                yield dict(insert)
 
         # TPCC
         if alg.find('-REF') == -1:
@@ -749,6 +787,8 @@ def update_conf(conf, exp):
     conf = set_tpcc(conf, **exp)
   elif exp['bench'] == 'TATP':
     conf = set_tatp(conf, **exp)
+  elif exp['bench'] == 'INSERT':
+    conf = set_insert(conf, **exp)
   else: assert False
   if exp['alg'].startswith('MICA') or exp['tag'] == 'backoff':
     conf = set_mica_confs(conf, **exp)
@@ -1124,6 +1164,9 @@ def run(exp, prepare_only):
 
   # run
   for trial in range(max_retries):
+    os.system('rm -f /mnt/huge/cicada/db/*')
+    os.system('rm -f /mnt/huge/cicada/relay/*')
+
     p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     #p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     try:
@@ -1189,6 +1232,8 @@ def run_all(pats, prepare_only):
 
   exps = list(sort_exps(exps))
   print('total %d exps to run' % len(exps))
+
+  print(exps)
 
   count_per_tag = {}
   for exp in exps:
