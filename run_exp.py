@@ -128,20 +128,58 @@ def set_tatp(conf, thread_count, scale_factor, tx_count, **kwargs):
 
 
 def set_insert(conf, thread_count, bench, inserts_per_txn, repl_enabled,
-               tx_count, logger, ccc, **kwargs):
+               tx_count, logger, ccc, use_upsert, **kwargs):
 
   conf = replace_def(conf, 'WORKLOAD', 'INSERT')
-  conf = replace_def(conf, 'WARMUP', str(0)) # TODO: Handle replication warmup
+  conf = replace_def(conf, 'WARMUP', str(0))
   conf = replace_def(conf, 'MICA_LOGGER', str(logger))
   conf = replace_def(conf, 'MICA_REPL_ENABLED', str(repl_enabled))
   conf = replace_def(conf, 'MICA_CCC', str(ccc))
+  conf = replace_def(conf, 'MICA_REPL_USE_UPSERT', str(use_upsert))
 
-  # TODO: Find proper settings for these
   conf = replace_def(conf, 'MAX_TXN_PER_PART', str(tx_count))
   conf = replace_def(conf, 'MAX_TUPLE_SIZE', str(8))
   conf = replace_def(conf, 'PART_CNT', str(1))
 
   conf = replace_def(conf, 'INSERT_INSERTS_PER_TXN', str(inserts_per_txn))
+
+
+  return conf
+
+
+def set_update(conf, thread_count, bench, total_count, updates_per_txn,
+               repl_enabled, tx_count, logger, ccc, **kwargs):
+
+  conf = replace_def(conf, 'WORKLOAD', 'UPDATE')
+  conf = replace_def(conf, 'WARMUP', str(0)) # TODO: Handle replication warmup
+  conf = replace_def(conf, 'SYNTH_TABLE_SIZE', str(total_count))
+  conf = replace_def(conf, 'MICA_LOGGER', str(logger))
+  conf = replace_def(conf, 'MICA_REPL_ENABLED', str(repl_enabled))
+  conf = replace_def(conf, 'MICA_CCC', str(ccc))
+
+  conf = replace_def(conf, 'MAX_TXN_PER_PART', str(tx_count))
+  conf = replace_def(conf, 'MAX_TUPLE_SIZE', str(8))
+  conf = replace_def(conf, 'PART_CNT', str(1))
+
+  conf = replace_def(conf, 'UPDATE_UPDATES_PER_TXN', str(updates_per_txn))
+
+  return conf
+
+
+def set_adversarial(conf, thread_count, bench, inserts_per_txn, repl_enabled,
+                    tx_count, logger, ccc, **kwargs):
+
+  conf = replace_def(conf, 'WORKLOAD', 'ADVERSARIAL')
+  conf = replace_def(conf, 'WARMUP', str(0)) # TODO: Handle replication warmup
+  conf = replace_def(conf, 'MICA_LOGGER', str(logger))
+  conf = replace_def(conf, 'MICA_REPL_ENABLED', str(repl_enabled))
+  conf = replace_def(conf, 'MICA_CCC', str(ccc))
+
+  conf = replace_def(conf, 'MAX_TXN_PER_PART', str(tx_count))
+  conf = replace_def(conf, 'MAX_TUPLE_SIZE', str(8))
+  conf = replace_def(conf, 'PART_CNT', str(1))
+
+  conf = replace_def(conf, 'ADVERSARIAL_INSERTS_PER_TXN', str(inserts_per_txn))
 
   return conf
 
@@ -192,8 +230,8 @@ max_thread_count = None
 
 prefix = ''
 suffix = ''
-total_seqs = 5
-max_retries = 3
+total_seqs = 1
+max_retries = 1
 
 hugepage_count = {
   # 32 GiB
@@ -373,12 +411,53 @@ def enum_exps(seq):
               logger = 'MICA_LOG_MMAP' if repl_enabled == 'true' else 'MICA_LOG_NULL'
               insert.update({ 'repl_enabled': repl_enabled, 'logger': logger })
               if repl_enabled == 'true':
-                for ccc in ('MICA_CCC_COPYCAT',):
-                  insert.update({ 'ccc': ccc })
+                ccc = 'MICA_CCC_COPYCAT'
+                for use_upsert in ('true', 'false'):
+                  insert.update({ 'ccc': ccc, 'use_upsert': use_upsert })
                   yield dict(insert)
               else:
                 insert.update({ 'ccc': 'MICA_CCC_NONE' })
                 yield dict(insert)
+
+        # UPDATE
+        if alg in ('MICA',):
+          update = dict(common)
+          total_count = 1 * 1000000
+          tx_count = 2000000
+          update.update({ 'bench': 'UPDATE', 'total_count': total_count,
+                          'tx_count': tx_count })
+
+          for updates_per_txn in [1]: # [1, 2, 4, 8]:
+            update.update({ 'updates_per_txn': updates_per_txn })
+            for repl_enabled in ('true', 'false'):
+              logger = 'MICA_LOG_MMAP' if repl_enabled == 'true' else 'MICA_LOG_NULL'
+              update.update({ 'repl_enabled': repl_enabled, 'logger': logger })
+              if repl_enabled == 'true':
+                for ccc in ('MICA_CCC_COPYCAT',):
+                  update.update({ 'ccc': ccc })
+                  yield dict(update)
+              else:
+                update.update({ 'ccc': 'MICA_CCC_NONE' })
+                yield dict(update)
+
+        # ADVERSARIAL
+        if alg in ('MICA',):
+          adversarial = dict(common)
+          tx_count = 2000000
+          adversarial.update({ 'bench': 'ADVERSARIAL', 'tx_count': tx_count })
+
+          for inserts_per_txn in [2**i for i in range(0, 7)]:
+            adversarial.update({ 'inserts_per_txn': inserts_per_txn })
+            for repl_enabled in ('true', 'false'):
+              logger = 'MICA_LOG_MMAP' if repl_enabled == 'true' else 'MICA_LOG_NULL'
+              adversarial.update({ 'repl_enabled': repl_enabled, 'logger': logger })
+              if repl_enabled == 'true':
+                for ccc in ('MICA_CCC_COPYCAT',):
+                  adversarial.update({ 'ccc': ccc })
+                  yield dict(adversarial)
+              else:
+                adversarial.update({ 'ccc': 'MICA_CCC_NONE' })
+                yield dict(adversarial)
 
         # TPCC
         if alg.find('-REF') == -1:
@@ -789,6 +868,10 @@ def update_conf(conf, exp):
     conf = set_tatp(conf, **exp)
   elif exp['bench'] == 'INSERT':
     conf = set_insert(conf, **exp)
+  elif exp['bench'] == 'UPDATE':
+    conf = set_update(conf, **exp)
+  elif exp['bench'] == 'ADVERSARIAL':
+    conf = set_adversarial(conf, **exp)
   else: assert False
   if exp['alg'].startswith('MICA') or exp['tag'] == 'backoff':
     conf = set_mica_confs(conf, **exp)
@@ -1164,8 +1247,12 @@ def run(exp, prepare_only):
 
   # run
   for trial in range(max_retries):
-    os.system('rm -f /mnt/huge/cicada/db/*')
-    os.system('rm -f /mnt/huge/cicada/relay/*')
+    os.system('rm -f /mnt/huge/cicada/log/init/*')
+    os.system('rm -f /mnt/huge/cicada/log/warmup/*')
+    os.system('rm -f /mnt/huge/cicada/log/workload/*')
+    os.system('rm -f /mnt/huge/cicada/relay/init/*')
+    os.system('rm -f /mnt/huge/cicada/relay/warmup/*')
+    os.system('rm -f /mnt/huge/cicada/relay/workload/*')
 
     p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     #p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
