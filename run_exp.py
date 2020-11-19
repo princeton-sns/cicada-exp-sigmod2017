@@ -128,14 +128,15 @@ def set_tatp(conf, thread_count, scale_factor, tx_count, **kwargs):
 
 
 def set_insert(conf, thread_count, bench, inserts_per_txn, repl_enabled,
-               tx_count, logger, ccc, use_upsert, **kwargs):
+               tx_count, logger, ccc, worker_count, **kwargs):
 
   conf = replace_def(conf, 'WORKLOAD', 'INSERT')
   conf = replace_def(conf, 'WARMUP', str(0))
   conf = replace_def(conf, 'MICA_LOGGER', str(logger))
   conf = replace_def(conf, 'MICA_REPL_ENABLED', str(repl_enabled))
   conf = replace_def(conf, 'MICA_CCC', str(ccc))
-  conf = replace_def(conf, 'MICA_REPL_USE_UPSERT', str(use_upsert))
+
+  conf = replace_def(conf, 'WORKER_CNT', str(worker_count))
 
   conf = replace_def(conf, 'MAX_TXN_PER_PART', str(tx_count))
   conf = replace_def(conf, 'MAX_TUPLE_SIZE', str(8))
@@ -238,9 +239,9 @@ hugepage_count = {
   'SILO': 32 * 1024 / 2,
   'TICTOC': 32 * 1024 / 2,
   'NO_WAIT': 32 * 1024 / 2,
-  # 32 GiB + 16 GiB for RCU + 8 GiB for logging
-  'MICA': (32 + 16 + 8) * 1024 / 2,
-  'MICA+INDEX': (32 + 16 + 8) * 1024 / 2,
+  # 32 GiB + 16 GiB for RCU + 8 GiB for logging + 8 GiB for scheduler
+  'MICA': (32 + 16 + 8 + 8) * 1024 / 2,
+  'MICA+INDEX': (32 + 16 + 8 + 8) * 1024 / 2,
   # 96 GiB
   'HEKATON': 96 * 1024 / 2,
 
@@ -403,21 +404,16 @@ def enum_exps(seq):
         if alg in ('MICA',):
           insert = dict(common)
           tx_count = 2000000
-          insert.update({ 'bench': 'INSERT', 'tx_count': tx_count })
+          insert.update({ 'bench': 'INSERT', 'tx_count': tx_count, 'inserts_per_txn': 1,
+                          'worker_count': 0 })
 
-          for inserts_per_txn in [1]: # [1, 2, 4, 8]:
-            insert.update({ 'inserts_per_txn': inserts_per_txn })
-            for repl_enabled in ('true', 'false'):
-              logger = 'MICA_LOG_MMAP' if repl_enabled == 'true' else 'MICA_LOG_NULL'
-              insert.update({ 'repl_enabled': repl_enabled, 'logger': logger })
-              if repl_enabled == 'true':
-                ccc = 'MICA_CCC_COPYCAT'
-                for use_upsert in ('true', 'false'):
-                  insert.update({ 'ccc': ccc, 'use_upsert': use_upsert })
-                  yield dict(insert)
-              else:
-                insert.update({ 'ccc': 'MICA_CCC_NONE' })
-                yield dict(insert)
+          insert.update({ 'repl_enabled': 'false', 'logger': 'MICA_LOG_NULL', 'ccc': 'MICA_CCC_NONE' })
+          yield dict(insert)
+
+          insert.update({ 'repl_enabled': 'true', 'logger': 'MICA_LOG_MMAP', 'ccc': 'MICA_CCC_COPYCAT' })
+          for worker_count in [2]:
+            insert.update({ 'worker_count': worker_count })
+            yield dict(insert)
 
         # UPDATE
         if alg in ('MICA',):
