@@ -421,12 +421,12 @@ def enum_exps(seq):
 
           io_counts = {
             1: 1, 2: 1, 3: 1, 4: 1, 6: 1, 8: 2, 10: 2,
-            12: 2, 14: 3, 16: 4, 18: 6, 20: 6,
+            12: 2, 14: 2, 16: 4, 18: 4, 20: 4,
           }
 
           worker_counts = {
-            1: 1, 2: 1, 3: 1, 4: 2, 6: 3, 8: 4, 10: 6,
-            12: 6, 14: 6, 16: 8, 18: 8, 20: 10,
+            1: 1, 2: 1, 3: 2, 4: 2, 6: 2, 8: 4, 10: 4,
+            12: 4, 14: 4, 16: 8, 18: 8, 20: 8,
           }
 
           insert.update({ 'worker_count': worker_counts[thread_count],
@@ -465,30 +465,33 @@ def enum_exps(seq):
         # ADVERSARIAL
         if alg in ('MICA',):
           adversarial = dict(common)
-          tx_count = 500000
-          adversarial.update({ 'bench': 'ADVERSARIAL', 'tx_count': tx_count,
-                               'io_count': 0, 'worker_count': 0 })
+          adversarial.update({ 'bench': 'ADVERSARIAL' })
 
-          for inserts_per_txn in [64]: # [2**i for i in range(0, 1)]:
-            adversarial.update({ 'inserts_per_txn': inserts_per_txn })
-            adversarial.update({ 'repl_enabled': 'false', 'logger': 'MICA_LOG_NULL', 'ccc': 'MICA_CCC_NONE' })
-            yield dict(adversarial) # replication disabled
-
-            adversarial.update({ 'repl_enabled': 'true', 'logger': 'MICA_LOG_MMAP',
-                                 'ccc': 'MICA_CCC_COPYCAT' })
-            io_counts = {
-              1: 1, 2: 1, 3: 1, 4: 1, 6: 1, 8: 1, 10: 1,
-              12: 1, 14: 1, 16: 1, 18: 1, 20: 1,
-            }
-
-            worker_counts = {
-              1: 1, 2: 2, 3: 1, 4: 1, 6: 1, 8: 1, 10: 1,
-              12: 1, 14: 1, 16: 1, 18: 1, 20: 1,
-            }
+          tx_count = 16000000
+          for inserts_per_txn in [2**i for i in range(0, 8)]:
+            adversarial.update({ 'inserts_per_txn': inserts_per_txn,
+                                 'tx_count': int(tx_count/inserts_per_txn) })
+            if thread_count <= 3:
+              adversarial.update({ 'io_count': 0, 'worker_count': 0 })
   
-            adversarial.update({ 'worker_count': worker_counts[thread_count],
-                                 'io_count': io_counts[thread_count] })
-            yield dict(adversarial) # replication enabled
+              adversarial.update({ 'repl_enabled': 'false', 'logger': 'MICA_LOG_NULL',
+                                   'ccc': 'MICA_CCC_NONE' })
+              yield dict(adversarial) # replication disabled
+
+            if thread_count == 1:
+              adversarial.update({ 'repl_enabled': 'true', 'logger': 'MICA_LOG_MMAP',
+                                   'ccc': 'MICA_CCC_COPYCAT' })
+              io_counts = {
+                1: 1, 2: 1, 4: 1, 8: 1, 16: 1, 32: 2, 64: 2, 128: 2,
+              }
+
+              worker_counts = {
+                1: 2, 2: 2, 4: 2, 8: 2, 16: 2, 32: 4, 64: 4, 128: 4,
+              }
+  
+              adversarial.update({ 'worker_count': worker_counts[inserts_per_txn],
+                                   'io_count': io_counts[inserts_per_txn] })
+              yield dict(adversarial) # replication enabled
 
 
         # TPCC
