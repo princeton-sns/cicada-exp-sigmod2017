@@ -417,7 +417,7 @@ def enum_exps(seq):
           insert.update({ 'repl_enabled': 'false', 'logger': 'MICA_LOG_NULL', 'ccc': 'MICA_CCC_NONE' })
           yield dict(insert) # replication disabled
 
-          insert.update({ 'repl_enabled': 'true', 'logger': 'MICA_LOG_MMAP', 'ccc': 'MICA_CCC_COPYCAT' })
+          insert.update({  })
 
           io_counts = {
             1: 1, 2: 1, 3: 1, 4: 1, 6: 1, 8: 2, 10: 2,
@@ -429,9 +429,12 @@ def enum_exps(seq):
             12: 4, 14: 4, 16: 8, 18: 8, 20: 8,
           }
 
-          insert.update({ 'worker_count': worker_counts[thread_count],
-                          'io_count': io_counts[thread_count] })
-          yield dict(insert) # replication enabled
+          # replication enabled
+          for ccc in ['MICA_CCC_COPYCAT', 'MICA_CCC_KUAFU']:
+            insert.update({ 'repl_enabled': 'true', 'logger': 'MICA_LOG_MMAP', 'ccc': ccc,
+                            'worker_count': worker_counts[thread_count],
+                            'io_count': io_counts[thread_count] })
+            yield dict(insert)
 
         # UPDATE
         if alg in ('MICA',):
