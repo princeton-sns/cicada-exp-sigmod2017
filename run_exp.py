@@ -417,8 +417,6 @@ def enum_exps(seq):
           insert.update({ 'repl_enabled': 'false', 'logger': 'MICA_LOG_NULL', 'ccc': 'MICA_CCC_NONE' })
           yield dict(insert) # replication disabled
 
-          insert.update({ 'repl_enabled': 'true', 'logger': 'MICA_LOG_MMAP', 'ccc': 'MICA_CCC_COPYCAT' })
-
           io_counts = {
             1: 1, 2: 1, 3: 1, 4: 1, 6: 1, 8: 2, 10: 2,
             12: 2, 14: 2, 16: 4, 18: 4, 20: 4,
@@ -429,9 +427,12 @@ def enum_exps(seq):
             12: 4, 14: 4, 16: 8, 18: 8, 20: 8,
           }
 
-          insert.update({ 'worker_count': worker_counts[thread_count],
-                          'io_count': io_counts[thread_count] })
-          yield dict(insert) # replication enabled
+          # replication enabled
+          for ccc in ['MICA_CCC_COPYCAT', 'MICA_CCC_KUAFU']:
+            insert.update({ 'repl_enabled': 'true', 'logger': 'MICA_LOG_MMAP', 'ccc': ccc,
+                            'worker_count': worker_counts[thread_count],
+                            'io_count': io_counts[thread_count] })
+            yield dict(insert)
 
         # UPDATE
         if alg in ('MICA',):
@@ -446,8 +447,6 @@ def enum_exps(seq):
             update.update({ 'repl_enabled': 'false', 'logger': 'MICA_LOG_NULL', 'ccc': 'MICA_CCC_NONE' })
             yield dict(update) # replication disabled
 
-            update.update({ 'repl_enabled': 'true', 'logger': 'MICA_LOG_MMAP',
-                            'ccc': 'MICA_CCC_COPYCAT' })
             io_counts = {
               1: 1, 2: 1, 3: 1, 4: 1, 6: 1, 8: 2, 10: 2,
               12: 2, 14: 3, 16: 4, 18: 4, 20: 4,
@@ -457,10 +456,13 @@ def enum_exps(seq):
               1: 1, 2: 1, 3: 1, 4: 2, 6: 3, 8: 4, 10: 6,
               12: 6, 14: 6, 16: 8, 18: 8, 20: 8,
             }
-  
-            update.update({ 'worker_count': worker_counts[thread_count],
+
+          # replication enabled
+          for ccc in ['MICA_CCC_COPYCAT', 'MICA_CCC_KUAFU']:
+            update.update({ 'repl_enabled': 'true', 'logger': 'MICA_LOG_MMAP', 'ccc': ccc,
+                            'worker_count': worker_counts[thread_count],
                             'io_count': io_counts[thread_count] })
-            yield dict(update) # replication enabled
+            yield dict(update)
 
         # ADVERSARIAL
         if alg in ('MICA',):
@@ -473,14 +475,12 @@ def enum_exps(seq):
                                  'tx_count': int(tx_count/inserts_per_txn) })
             if thread_count <= 3:
               adversarial.update({ 'io_count': 0, 'worker_count': 0 })
-  
+
               adversarial.update({ 'repl_enabled': 'false', 'logger': 'MICA_LOG_NULL',
                                    'ccc': 'MICA_CCC_NONE' })
               yield dict(adversarial) # replication disabled
 
             if thread_count == 1:
-              adversarial.update({ 'repl_enabled': 'true', 'logger': 'MICA_LOG_MMAP',
-                                   'ccc': 'MICA_CCC_COPYCAT' })
               io_counts = {
                 1: 1, 2: 1, 4: 1, 8: 1, 16: 1, 32: 2, 64: 2, 128: 2,
               }
@@ -488,10 +488,13 @@ def enum_exps(seq):
               worker_counts = {
                 1: 2, 2: 2, 4: 2, 8: 2, 16: 2, 32: 4, 64: 4, 128: 4,
               }
-  
-              adversarial.update({ 'worker_count': worker_counts[inserts_per_txn],
-                                   'io_count': io_counts[inserts_per_txn] })
-              yield dict(adversarial) # replication enabled
+
+              # replication enabled
+              for ccc in ['MICA_CCC_COPYCAT', 'MICA_CCC_KUAFU']:
+                adversarial.update({ 'repl_enabled': 'true', 'logger': 'MICA_LOG_MMAP', 'ccc': ccc,
+                                     'worker_count': worker_counts[thread_count],
+                                     'io_count': io_counts[thread_count] })
+                yield dict(adversarial)
 
 
         # TPCC
