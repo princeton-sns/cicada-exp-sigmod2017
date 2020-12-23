@@ -246,9 +246,9 @@ hugepage_count = {
   'SILO': 32 * 1024 / 2,
   'TICTOC': 32 * 1024 / 2,
   'NO_WAIT': 32 * 1024 / 2,
-  # 32 GiB + 16 GiB for RCU + 8 GiB for logging + 8 GiB for scheduler
-  'MICA': (32 + 16 + 8 + 8) * 1024 / 2,
-  'MICA+INDEX': (32 + 16 + 8 + 8) * 1024 / 2,
+  # 32 GiB + 16 GiB for RCU + 16 GiB for logging + 8 GiB for scheduler
+  'MICA': (32 + 16 + 16 + 8) * 1024 / 2,
+  'MICA+INDEX': (32 + 16 + 16 + 8) * 1024 / 2,
   # 96 GiB
   'HEKATON': 96 * 1024 / 2,
 
